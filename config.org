@@ -1,0 +1,558 @@
+#+TITLE: Doom Emacs Configuration
+#+AUTHOR: Ao Shen
+#+DATE: Saturday, May 16, 2020
+#+STARTUP: content
+#+PROPERTY: header-args :tangle yes :comments link
+
+* User name and date
+#+BEGIN_SRC elisp
+#+END_SRC
+
+* Look and Feel
+We have to get font and window look correct, but it is hard than I thought.
+#+BEGIN_SRC elisp
+(setq doom-font       (font-spec :family "Sarasa Term Slab CL" :size 14)
+      doom-serif-font (font-spec :family "Sarasa Term CL"   :size 14))
+#+END_SRC
+
+If started in window system, make it full screen.
+#+BEGIN_SRC elisp
+(if (eq initial-window-system 'mac)
+    (add-to-list 'initial-frame-alist '(fullscreen . fullboth)))
+(if (eq initial-window-system 'ns)
+    (add-to-list 'initial-frame-alist '(fullscreen . maximized)))
+#+END_SRC
+
+** No visual-line
+Doom introduces ~visual-line-mode~ open in text mode, which does not make sense,
+because in org mode the table is screwed, and we can always turn it on manually.
+#+BEGIN_SRC elisp
+(remove-hook 'text-mode-hook #'visual-line-mode)
+#+END_SRC
+
+** Doom-modeline
+We would like to have minor modes (simply for fun) and buffer mode icons.
+
+Here we need more attention to this modeline to make it consistent with doom defaults.
+#+BEGIN_SRC elisp
+(setq doom-modeline-major-mode-icon t
+      doom-modeline-modal-icon nil)
+#+END_SRC
+
+I'm not sure why, but now ~anzu-mode~ seems to be required by doom-modeline.
+#+BEGIN_SRC elisp
+(after! anzu
+  (global-anzu-mode +1))
+#+END_SRC
+
+It seems for me that in the modeLine, the distance between ~modal~ and
+~buffer-info~ are way too large.
+#+BEGIN_SRC elisp
+(defun doom-modeline--trim-space (seg)
+  "HACK: Trim the last whitespace of returned string from modeline segment.
+
+Used to make the modeline more compact for me without much code"
+  (substring seg 1 -1))
+(after! doom-modeline
+  (advice-add 'doom-modeline-segment--modals :filter-return #'doom-modeline--trim-space))
+#+END_SRC
+
+To make it plays well with `pretty-code` of iosevka font, a custom fontset must
+be made and set for the modeline.
+#+BEGIN_SRC elisp :tangle no
+(defun +all-the-icons--fontset-for-modeline ()
+ "HACK: Manually activate all-the-icons font for the modeline as
+`+pretty-code-setup-iosevka-ligatures-h' overwrite default fontset."
+ (create-fontset-from-fontset-spec "-*-Sarasa Mono SC-normal-normal-normal-*-*-*-*-*-m-*-fontset-modeline")
+ (set-face-attribute 'mode-line nil :fontset "fontset-modeline" :font "fontset-modeline")
+ (set-face-attribute 'mode-line-inactive nil :fontset "fontset-modeline" :font "fontset-modeline")
+ (set-fontset-font "fontset-modeline" 'unicode (font-spec :family "Material Icons") nil 'prepend)
+ (set-fontset-font "fontset-modeline" 'unicode (font-spec :family "all-the-icons") nil 'append)
+ (set-fontset-font "fontset-modeline" 'unicode (font-spec :family "file-icons") nil 'append)
+ (set-fontset-font "fontset-modeline" 'unicode (font-spec :family "github-octicons") nil 'append)
+ (set-fontset-font "fontset-modeline" 'unicode (font-spec :family "FontAwesome") nil 'append)
+ (set-fontset-font "fontset-modeline" 'unicode (font-spec :family "Weather Icons") nil 'append))
+(when (display-multi-font-p)
+ (advice-add '+pretty-code-setup-iosevka-ligatures-h :after #'+all-the-icons--fontset-for-modeline))
+#+END_SRC
+
+It is *very hard* to get correct. I spent almost one entire day on it!
+
+** Theme
+Quick switch between light and dark theme with =SPC t T=
+#+BEGIN_SRC elisp
+(defvar doom-circle-themes-list
+  '(doom-one doom-one-light doom-solarized-light)
+  "List for circle switching themes")
+#+END_SRC
+
+In Emacs 27+, we have a new face attribute ~extend:~. Though it has been around
+for time, some themes I use still lack proper support.
+#+BEGIN_SRC elisp
+(custom-set-faces!
+  '((nav-flash-face company-tooltip-selection org-block helm-selection)
+    :extend t)
+  '(org-block-begin-line :inherit org-block)
+  '(org-block-end-line :inherit org-block-begin-line))
+#+END_SRC
+
+*** Helper Implementation
+:PROPERTIES:
+:VISIBILITY: folded
+:END:
+#+BEGIN_SRC elisp
+(defun doom/circle-theme ()
+  "Cycle through themes defined in `doom-circle-themes-list'.
+
+`doom-theme' is overloaded here to record current position in the list"
+  (interactive)
+  (let* ((circle-themes (or (cdr (memq doom-theme doom-circle-themes-list))
+                             doom-circle-themes-list))
+         (next-theme (car circle-themes))
+         (progress-reporter (make-progress-reporter
+                             (format "Loading theme %s..."
+                                     (setq doom-theme next-theme)))))
+    (doom/reload-theme)
+    (progress-reporter-done progress-reporter)))
+(map! :leader (:prefix "t"
+               :desc "Circle through themes" "T"  #'doom/circle-theme))
+#+END_SRC
+
+*** Theme for =helm-rg=
+A quick and dirty patch for doom-themes.
+#+BEGIN_SRC elisp :tangle no
+(after! helm-rg
+  (doom-themes-set-faces 'user
+    '(helm-rg-line-number-match-face :inherit 'line-number :underline t)
+    '(helm-rg-preview-line-highlight :background green :foreground base0)
+    '(helm-rg-base-rg-cmd-face :foreground base4 :weight 'normal)
+    '(helm-rg-extra-arg-face :foreground yellow :weight 'normal)
+    '(helm-rg-inactive-arg-face :foreground base4 :weight 'normal)
+    '(helm-rg-active-arg-face :foreground green)
+    '(helm-rg-directory-cmd-face :foreground base4 :background base1 :weight 'normal)
+    '(helm-rg-error-message :foreground red)
+    '(helm-rg-title-face :foreground magenta :background base0 :weight 'bold)
+    '(helm-rg-directory-header-face :foreground fg :background base0 :weight 'bold)
+    '(helm-rg-file-match-face :foreground methods)
+    '(helm-rg-colon-separator-ripgrep-output-face :foreground fg)
+    '(helm-rg-match-text-face :foreground fg :background magenta)))
+#+END_SRC
+
+** Ligatures
+In MacPort version we have ~mac-auto-operator-composition-mode~ and in more than
+EMACS 27 we have HarfBuzz support.
+
+#+BEGIN_SRC elisp
+(use-package composite
+      :defer t
+      :init
+      (defvar composition-ligature-table (make-char-table nil))
+      :hook
+      (((prog-mode conf-mode nxml-mode markdown-mode help-mode)
+        . (lambda () (setq-local composition-function-table composition-ligature-table))))
+      :config
+      ;; support ligatures, some toned down to prevent hang
+      (when (version<= "27.0" emacs-version)
+        (let ((alist
+               '((?!  . "\\(?:!\\(?:===?\\|[!=]\\)\\)")
+                 (?*  . "\\(?:\\*\\(?:\\*[*/]\\|[)*/>]\\)?\\)")                            ; (regexp-opt '("*" "**" "***" "**/" "*/" "*>" "*)"))
+                 (?+  . "\\(?:\\++\\)\\([>:]\\)?")
+                 (?-  . "-+\\(?:>>?-*\\||\\|:\\)")
+                 (?.  . "\\(?:\\.\\(?:\\.[.<]\\|[.=>-]\\)\\)")                             ; (regexp-opt '(".-" ".." "..." "..<" ".=" ".>"))
+                 (?/  . "\\(?:/\\(?:\\*\\*\\|//\\|==\\|[*/=>]\\)\\)")                      ; (regexp-opt '("/*" "/**" "//" "///" "/=" "/==" "/>"))
+                 (?:  . "\\(?::\\(?:::\\|[+:<=>]\\)?\\)")                                  ; (regexp-opt '(":" "::" ":::" ":=" ":<" ":=" ":>" ":+"))
+                 (?\; . ";;")                                                              ; (regexp-opt '(";;"))
+                 (?0  . "0\\(?:\\(x[a-fA-F0-9]\\).?\\)") ; Tries to match the x in 0xDEADBEEF
+                 ;; (?x . "x") ; Also tries to match the x in 0xDEADBEEF
+                 ;; (regexp-opt '("<!--" "<$" "<$>" "<*" "<*>" "<**>" "<+" "<+>" "<-" "<--" "<---" "<->" "<-->" "<--->" "</" "</>" "<<" "<<-" "<<<" "<<=" "<=" "<=<" "<==" "<=>" "<===>" "<>" "<|" "<|>" "<~" "<~~" "<." "<.>" "<..>"))
+                 (?<  . "\\(?:<\\(?:!--\\|\\$>\\|\\*\\(?:\\*?>\\)\\|\\+>\\|-\\(?:-\\(?:->\\|[>-]\\)\\|[>-]\\)\\|\\.\\(?:\\.?>\\)\\|/>\\|<[<=-]\\|=\\(?:==>\\|[<=>]\\)\\||>\\|~~\\|[$*+./<=>|~-]\\)\\)")
+                 (?=  . "=+>?")
+                 (?>  . "\\(?:>\\(?:->\\|=>\\|>[=>-]\\|[:=>-]\\)\\)")                      ; (regexp-opt '(">-" ">->" ">:" ">=" ">=>" ">>" ">>-" ">>=" ">>>"))
+                 (??  . "\\(?:\\?[.:=?]\\)")                                               ; (regexp-opt '("??" "?." "?:" "?="))
+                 (?\[ . "\\(?:\\[\\(?:|]\\|[]|]\\)\\)")                                    ; (regexp-opt '("[]" "[|]" "[|"))
+                 (?\\ . "\\(?:\\\\\\\\[\\n]?\\)")                                          ; (regexp-opt '("\\\\" "\\\\\\" "\\\\n"))
+                 (?^  . "\\(?:\\^==?\\)")                                                  ; (regexp-opt '("^=" "^=="))
+                 (?w  . "\\(?:wwww?\\)")                                                   ; (regexp-opt '("www" "wwww"))
+                 (?{  . "\\(?:{\\(?:|\\(?:|}\\|[|}]\\)\\|[|-]\\)\\)")                      ; (regexp-opt '("{-" "{|" "{||" "{|}" "{||}"))
+                 (?|  . "\\(?:|\\(?:->\\|=>\\||=\\|[]=>|}-]\\)\\)")                        ; (regexp-opt '("|=" "|>" "||" "||=" "|->" "|=>" "|]" "|}" "|-"))
+                 (?_  . "\\(?:_\\(?:|?_\\)\\)")                                            ; (regexp-opt '("_|_" "__"))
+                 (?\( . "\\(?:(\\*\\)")                                                    ; (regexp-opt '("(*"))
+                 (?~  . "\\(?:~\\(?:~>\\|[>~]\\)\\)")) ; (regexp-opt '("~>" "~~>" "~~"))
+               ))
+          (dolist (char-regexp alist)
+            (set-char-table-range composition-ligature-table (car char-regexp)
+                                  `([,(cdr char-regexp) 0 font-shape-gstring]))))
+        (set-char-table-parent composition-ligature-table composition-function-table)))
+
+(if (fboundp 'mac-auto-operator-composition-mode)
+    (mac-auto-operator-composition-mode +1))
+#+END_SRC
+
+* Key Bindings
+** Leader Key
+The default ~doom-leader-alt-key~ won't work because =M-SPC= is macOS system
+wide binding. The reason behind =M-m= is to follow =M-x=, this choice is due to
+many constraints of host system.
+#+BEGIN_SRC elisp
+(setq doom-leader-alt-key "M-m"
+      doom-localleader-alt-key "M-m m")
+#+END_SRC
+For the console we dont have =M-= keys as they are symbols, need more work.
+
+** Scratchpads
+Doom emacs provides persistent scratchpads mechanisms that can be global or
+project-specific. However, autosaving scratchpad is not desired sometimes as I
+don't have many projects. And saving them could take memory.
+
+So here the vanilla `*scratch*` buffer is popped up with =SPC s=
+#+BEGIN_SRC elisp
+(set-popup-rule! "^\\*scratch\\*$" :size 0.35 :select t :modeline t :quit t :ttl nil)
+(defun doom/open-vanilla-scratchpad ()
+  "Open vanilla `*scratch*` buffer in popup window.
+WARNING: This buffer has no auto-save functionality"
+  (interactive)
+  (pop-to-buffer "*scratch*"))
+(define-leader-key!
+  :desc "Pop up temp scratch" "z" #'doom/open-vanilla-scratchpad)
+#+END_SRC
+
+** Evil maps
+Some of major mode need to be added in ~evil-motion-maps~ as default
+configuration does not provides them.
+#+BEGIN_SRC elisp
+(after! osx-dictionary
+  (add-to-list 'evil-motion-state-modes 'osx-dictionary-mode))
+#+END_SRC
+
+** Hydras
+These Hydras shall be autoloaded, please see the ~hydra-ocean~ module.
+
+* Org Mode
+
+We use Dropbox to store main org mode files.
+To avoid fuzzy latex preview we should use `dvisvgm` as previewer.
+#+BEGIN_SRC elisp
+(setq org-directory "~/Dropbox/org"
+      org-preview-latex-default-process 'dvisvgm)
+#+END_SRC
+
+* LSP
+We have used a customed ~ccls~ binary, so we need to make emacs find it.
+#+BEGIN_SRC elisp
+(setq ccls-executable "/Users/sao/.local/bin/ccls")
+(after! ccls
+  (setq ccls-initialization-options
+        '(:clang (:extraArgs
+                  ["-isysroot/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/"
+                   "-I/usr/local/include"
+                   "-isystem/opt/local/libexec/llvm-9.0/include/c++/v1"
+                   "-isystem/opt/local/libexec/llvm-9.0/lib/clang/9.0.1/include"]
+                  :resourceDir "/opt/local/libexec/llvm-9.0/lib/clang/9.0.1"))
+        ccls-sem-highlight-method 'font-lock))
+#+END_SRC
+
+Also, we are using =rust-analyzer= for rust completion now.
+#+BEGIN_SRC elisp
+(after! rustic
+  (setq rustic-lsp-server 'rust-analyzer))
+#+END_SRC
+
+* Lisp
+~Lispyville~ key themes
+#+BEGIN_SRC elisp
+(after! lispyville
+  (setq lispyville-key-theme
+        '((operators normal)
+          prettify
+          ;text-objects
+          mark-toggle
+          (atom-movement normal visual)
+          slurp/barf-lispy
+          additional additional-insert))
+  (lispyville-set-key-theme)
+  (lispy-define-key lispy-mode-map "v" #'lispyville-toggle-mark-type))
+#+END_SRC
+
+
+Make ~evil-goggles~ works with ~lispyville~. Adopted from [[https://github.com/edkolev/evil-goggles/pull/26][an upstream stalled PR]].
+
+The patch is not very polished, as it does not give most accurate information.
+But it is better than nothing.
+#+BEGIN_SRC elisp
+(defun evil-goggles--lispyville-yank-line-async-advice (beg end type &rest _)
+  "Advice for `lispyville-yank-line' to show async hint.
+
+This is basically a wrapper of `evil-goggles--generic-async-advice' but
+with the called in normal mode case considered"
+  (let ((beg (or beg (point)))
+        (end (or end (if type beg (line-end-position)))))
+    (funcall-interactively 'evil-goggles--generic-async-advice beg end)))
+(after! evil-goggles
+  (pushnew! evil-goggles--commands
+            '(lispyville-yank
+              :face evil-goggles-yank-face
+              :switch evil-goggles-enable-yank
+              :advice evil-goggles--generic-async-advice)
+            '(lispyville-delete
+              :face evil-goggles-delete-face
+              :switch evil-goggles-enable-delete
+              :advice evil-goggles--generic-blocking-advice)
+            '(lispyville-change
+              :face evil-goggles-change-face
+              :switch evil-goggles-enable-change
+              :advice evil-goggles--generic-blocking-advice)
+            '(lispyville-yank-line
+              :face evil-goggles-yank-face
+              :switch evil-goggles-enable-yank
+              :advice evil-goggles--lispyville-yank-line-async-advice)
+            '(lispyville-delete-line
+              :face evil-goggles-delete-face
+              :switch evil-goggles-enable-delete
+              :advice evil-goggles--delete-line-advice)
+            '(lispyville-change-line
+              :face evil-goggles-change-face
+              :switch evil-goggles-enable-change
+              :advice evil-goggles--generic-blocking-advice)
+            '(lispyville-change-whole-line
+              :face evil-goggles-change-face
+              :switch evil-goggles-enable-change
+              :advice evil-goggles--generic-blocking-advice)
+            '(lispyville-join
+              :face evil-goggles-join-face
+              :switch evil-goggles-enable-join
+              :advice evil-goggles--join-advice)
+            '(lispyville-comment-or-uncomment
+              :face evil-goggles-nerd-commenter-face
+              :switch evil-goggles-enable-nerd-commenter
+              :advice evil-goggles--generic-async-advice)
+            '(lispyville-prettify
+              :face evil-goggles-indent-face
+              :switch evil-goggles-enable-indent
+              :advice evil-goggles--generic-async-advice)))
+#+END_SRC
+
+* Dired
+Deleting should be put into trash if we are using macOS (as it is *always*
+available)
+#+BEGIN_SRC elisp
+(when IS-MAC
+  (setq delete-by-moving-to-trash t))
+#+END_SRC
+
+* TeX & LaTeX
+* PDF
+Oddly the pdf-isearch-link does not got a keybind
+#+BEGIN_SRC elisp
+(after! pdf-tools
+  (map! :map pdf-view-mode-map
+      :gn "f" #'pdf-links-isearch-link))
+#+END_SRC
+
+* Look-up
+#+begin_src emacs-lisp :tangle yes
+(after! dash-docs
+  (setq dash-docs-docsets-path
+        "/Users/sao/Library/Application Support/Dash/DocSets"))
+#+end_src
+
+* XWidgets
+If we have x widget support, in most cases we prefer embedded web view.
+#+BEGIN_SRC elisp
+(if (featurep 'xwidget-internal)
+    (setq browse-url-browser-function #'xwidget-webkit-browse-url))
+#+END_SRC
+
+* Ivy
+Make we preview buffer when we are switching buffers.
+#+BEGIN_SRC elisp
+(after! ivy
+  (defadvice! ivy--evil-split-prompt-for-buffer (&rest _)
+    :after '(evil-window-split evil-window-vsplit)
+    (+ivy/switch-buffer))
+  (setq +ivy-buffer-preview t))
+#+END_SRC
+
+Remove annoying length change of popup frame.
+#+BEGIN_SRC elisp
+(after! ivy-rich
+  (plist-put ivy-rich-display-transformers-list 'counsel-describe-function
+             '(:columns
+               ((counsel-describe-function-transformer (:width 40))
+                (ivy-rich-counsel-function-docstring (:face font-lock-doc-face :width 80)))))
+  (plist-put ivy-rich-display-transformers-list 'counsel-describe-variable
+             '(:columns
+               ((counsel-describe-variable-transformer (:width 40))
+                (+ivy-rich-describe-variable-transformer (:width 20)) ; display variable value
+                (ivy-rich-counsel-variable-docstring (:face font-lock-doc-face :width 60)))))
+  (plist-put ivy-rich-display-transformers-list 'counsel-M-x
+             '(:columns
+               ((counsel-M-x-transformer (:width 40))
+                (ivy-rich-counsel-function-docstring (:face font-lock-doc-face :width 80)))))
+  (ivy-rich-mode +1))
+#+END_SRC
+
+* Helm
+Some key bindings.
+#+BEGIN_SRC elisp :tangle no
+(defun helm-multi-swoop--exec-interactive ()
+  (interactive)
+  (helm-exit-and-execute-action 'helm-multi-swoop--exec))
+(map! :map 'helm-multi-swoop-buffers-map
+      :ni "RET" 'helm-multi-swoop--exec-interactive)
+(map! :map 'helm-map
+      :n "m" 'helm-toggle-visible-mark
+      :n "<tab>" 'helm-select-action
+      :n "[[" 'helm-previous-source
+      :n "]]" 'helm-next-source
+      :n "gk" 'helm-previous-source
+      :n "gj" 'helm-next-source
+      :n "(" 'helm-prev-visible-mark
+      :n ")" 'helm-next-visible-mark
+      :n "j" 'helm-next-line
+      :n "k" 'helm-previous-line
+      :n "gg" 'helm-beginninng-of-buffer
+      :n "G" 'helm-end-of-buffer
+
+      :n "/" 'helm-quit-and-find-file
+
+      :n "gr" 'helm-refresh
+
+      :n "yp" 'helm-yank-selection
+      :n "yP" 'helm-copy-to-buffer
+      :n "yy" 'helm-kill-selection-and-quit
+
+      :ni "RET" 'helm-maybe-exit-minibuffer
+      :ni "M-v" 'helm-previous-page
+      :ni "C-v" 'helm-next-page
+      )
+#+END_SRC
+
+Doom has done too much to disable helm's own good behaviour.
+#+BEGIN_SRC elisp :tangle no
+(when (featurep! :completion helm)
+  (setq helm-default-display-buffer-functions nil
+        helm-display-header-line t
+        helm-display-buffer-default-height 17
+        helm-display-buffer-width 96
+        helm-split-window-inside-p t
+        helm-display-function #'helm-display-buffer-in-posframe
+        helm-ff-auto-update-initial-value t)
+  (set-popup-rule! "^\\*helm" :ignore t))
+(after! helm
+  (remove-hook 'helm-after-initialize-hook #'+helm--hide-mode-line)
+  (advice-remove 'helm-display-mode-line #'+helm--hide-mode-line)
+  (advice-remove 'helm-ag-show-status-default-modeline #'ignore)
+  (advice-remove 'helm-describe-function 'doom-use-helpful-a)
+  (advice-remove 'helm-describe-variable 'doom-use-helpful-a)
+  (setq helm-describe-function-function #'helpful-function
+        helm-describe-variable-function #'helpful-variable))
+#+END_SRC
+
+Make ~helm-display-buffer-in-own-frame~ respect ~doom-font~.
+#+BEGIN_SRC elisp :tangle no
+(when (featurep! :completion helm)
+  (defun helm-display-buffer-in-posframe (buffer &optional resume)
+    "Display helm buffer BUFFER in a separate frame.
+
+Function suitable for `helm-display-function',
+`helm-completion-in-region-display-function'
+and/or `helm-show-completion-default-display-function'.
+
+See `helm-display-buffer-height' and `helm-display-buffer-width' to
+configure frame size.
+
+Note that this feature is available only with emacs-25+."
+    (cl-assert (and (fboundp 'window-absolute-pixel-edges)
+                    (fboundp 'frame-geometry))
+               nil "Helm buffer in own frame is only available starting at emacs-25+")
+    (if (not (display-graphic-p))
+        ;; Fallback to default when frames are not usable.
+        (helm-default-display-buffer buffer)
+      (setq helm--buffer-in-new-frame-p t)
+      (let* ((pos (window-absolute-pixel-position))
+             (half-screen-size (/ (display-pixel-height x-display-name) 2))
+             (frame-info (frame-geometry))
+             (prmt-size (length helm--prompt))
+             (line-height (frame-char-height))
+             (right-bound (cadr (assq 'outer-size frame-info)))
+             (frame-left (if (< (+ (car pos) (* (frame-char-width) helm-display-buffer-width))
+                                right-bound)
+                             (- (car pos)
+                                (* (frame-char-width)
+                                   (if (< (- (point) (point-at-bol)) prmt-size)
+                                       (- (point) (point-at-bol))
+                                     prmt-size)))
+                           (- right-bound (* (frame-char-width)
+                                             (+ 2 helm-display-buffer-width)))))
+             tab-bar-mode
+             (default-frame-alist
+               (if resume
+                   (buffer-local-value 'helm--last-frame-parameters
+                                       (get-buffer buffer))
+                 `((font . ,(font-xlfd-name doom-font))
+                   (width . ,helm-display-buffer-width)
+                   (height . ,helm-display-buffer-height)
+                   (tool-bar-lines . 0)
+                   (left . ,frame-left)
+                   ;; Try to put frame at the best possible place.
+                   ;; Frame should be below point if enough
+                   ;; place, otherwise above point and
+                   ;; current line should not be hidden
+                   ;; by helm frame.
+                   (top . ,(if (> (cdr pos) half-screen-size)
+                               ;; Above point
+                               (- (cdr pos)
+                                  ;; add 1 lines to make sure there is always a gap
+                                  (* (+ helm-display-buffer-height 1) line-height))
+                             ;; Below point
+                             (+ (cdr pos) line-height)))
+                   (title . "Helm")
+                   (undecorated . ,helm-use-undecorated-frame-option)
+                   (background-color . ,(or helm-frame-background-color
+                                            (face-attribute 'default :background)))
+                   (foreground-color . ,(or helm-frame-foreground-color
+                                            (face-attribute 'default :foreground)))
+                   (alpha . ,(or helm-frame-alpha 100))
+                   (vertical-scroll-bars . nil)
+                   (menu-bar-lines . 0)
+                   (fullscreen . nil)
+                   (visibility . ,(null helm-display-buffer-reuse-frame))
+                   (minibuffer . t)
+                   (parent-frame . (window-frame)))))
+             display-buffer-alist)
+        ;; Display minibuffer above or below only in initial session,
+        ;; not on a session triggered by action, this way if user have
+        ;; toggled minibuffer and header-line manually she keeps this
+        ;; setting in next action.
+        (unless (or helm--executing-helm-action resume)
+          ;; Add the hook inconditionally, if
+          ;; helm-echo-input-in-header-line is nil helm-hide-minibuffer-maybe
+          ;; will have anyway no effect so no need to remove the hook.
+          (add-hook 'helm-minibuffer-set-up-hook 'helm-hide-minibuffer-maybe)
+          (with-helm-buffer
+            (setq-local helm-echo-input-in-header-line
+                        (not (> (cdr pos) half-screen-size)))))
+        (helm-display-buffer-popup-frame buffer default-frame-alist)
+        ;; When frame size have been modified manually by user restore
+        ;; it to default value unless resuming or not using
+        ;; `helm-display-buffer-reuse-frame'.
+        ;; This have to be done AFTER raising the frame otherwise
+        ;; minibuffer visibility is lost until next session.
+        (unless (or resume (not helm-display-buffer-reuse-frame))
+          (set-frame-size helm-popup-frame
+                          helm-display-buffer-width
+                          helm-display-buffer-height)))
+      (helm-log-run-hook 'helm-window-configuration-hook))))
+#+END_SRC
+
+Doom's default helm settings make no sense...
+#+BEGIN_SRC elisp :tangle no
+(use-package! swiper-helm
+  :bind ([remap swiper] . #'swiper-helm)
+  :config
+  (setq swiper-helm-display-function #'swiper-helm-default-display-buffer))
+#+END_SRC
+
+* Note in case something odd happens
+- To have a good unicode font, layer `unicode` may be installed
+- We need some profiling about `pretty-code modes`

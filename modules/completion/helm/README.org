@@ -1,0 +1,72 @@
+#+TITLE:   completion/helm-ocean
+#+DATE:    May 28, 2020
+#+SINCE:   2.0.9
+#+STARTUP: inlineimages nofold
+
+* Table of Contents :TOC_3:noexport:
+- [[#description][Description]]
+  - [[#maintainers][Maintainers]]
+  - [[#module-flags][Module Flags]]
+  - [[#plugins][Plugins]]
+  - [[#hacks][Hacks]]
+- [[#prerequisites][Prerequisites]]
+- [[#features][Features]]
+  - [[#why-helm-over-ivy][Why Helm over Ivy?]]
+  - [[#why-rewrite][Why rewrite?]]
+- [[#configuration][Configuration]]
+- [[#troubleshooting][Troubleshooting]]
+
+* Description
+It rewrites dooms default ~helm~ configure, aimed to be better.
+
+** Maintainers
+This module has no dedicated maintainers.
+
+** Module Flags
+This module provides no flags.
+
+** Plugins
++ [[github:emacs-helm/helm][helm]]
++ [[github:emacs-jp/helm-c-yasnippet][helm-c-yasnippet]]
++ [[github:emacsorphanage/helm-swoop][helm-swoop]]
++ [[github:emacsorphanage/helm-ag][helm-ag]]
++ [[github:emacs-helm/helm-org][helm-org]]
+
+** Hacks
+- It removes serval hacks in [[doom-modules:ui/popup/README.org][:ui popup]] module.
+
+* Prerequisites
+This module has no prerequisites.
+
+* Features
+This module aims to provide a better ~helm~ support than doom's [[doom-modules:completion/helm/config.el][helm]] module.
+
+** Why Helm over Ivy?
+Both of them have done a great job in term of incremental matching. But there is
+a difference that Helm is using normal buffers to complete, rather than in
+minibuffer. It actually can be less obstructive than Ivy --- through
+simpleness is a selling point of Ivy.
+
+Ivy's dependent on minibuffer means that each time it pop-up, the whole window
+configuration have to be changed. And on a modern 2K display, the minibuffer is
+a *long* one. You ended up with nearly 1/6 of your screen displaying nothing.
+
+~+posframe~ can solve the problem partially. But when we are using ~swiper~ or
+~swoop~, the minibuffer problem comes back.
+
+** Why rewrite?
+Doom's original helm module is quite incomplete. It tries to make ~helm~ behaves
+like ~ivy~, hence missing the whole point.
+
+There are other issues in the module, too.
+
+- By default ~swiper~ is *not* remapped to ~helm-swiper~.
+- ~helm-rg~ seems to be obsolete (we opted for ~helm-ag~).
+
+* Configuration
+# How to configure this module, including common problems and how to address them.
+
+* Troubleshooting
+# Common issues and their solution, or places to look for help.
+
+#  LocalWords:  minibuffer
