@@ -1,0 +1,6 @@
+ My Emacs configuration based on doom-emacs
+============================================
+Anything interesting is in the config.org file. Also, I have a modified version
+of helm module in the modules folder.
+
+All files in the repo is published under GPLv3 or any version later.
