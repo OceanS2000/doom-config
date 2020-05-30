@@ -10,7 +10,7 @@
        :completion
        (company +childframe)          ; the ultimate code completion backend
        ;;helm                         ; the other search engine for love and live
-       helm                     ; the *other* search engine for love and live
+       (helm +childframe)             ; the *other* search engine for love and live
        ;;ido                          ; the other *other* search engine...
        ;;(ivy +prescient +childframe) ; a search engine for love and life
 

@@ -34,7 +34,6 @@
         helm-display-buffer-width 96
         helm-display-buffer-default-height 17
         helm-split-window-inside-p t
-        helm-display-function #'+helm--display-buffer-in-posframe-fn
         helm-display-buffer-reuse-frame t
         ;; When calling `helm-semantic-or-imenu', don't immediately jump to
         ;; symbol at point
@@ -77,6 +76,10 @@
 
   ;; Hide minibuffer if `helm-echo-input-in-header-line'
   (add-hook 'helm-minibuffer-set-up-hook #'helm-hide-minibuffer-maybe)
+
+  (when (featurep! +childframe)
+    (setq helm-display-function #'+helm--display-buffer-in-posframe-fn)
+    (pushnew! helm--frame-default-attributes 'parent-frame 'font))
 
   ;; Use helpful instead of describe-* to display documentation
   (setq helm-describe-function-function #'helpful-function

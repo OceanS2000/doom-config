@@ -39,12 +39,6 @@ Here we need more attention to this modeline to make it consistent with doom def
       doom-modeline-modal-icon nil)
 #+END_SRC
 
-I'm not sure why, but now ~anzu-mode~ seems to be required by doom-modeline.
-#+BEGIN_SRC elisp
-(after! anzu
-  (global-anzu-mode +1))
-#+END_SRC
-
 It seems for me that in the modeLine, the distance between ~modal~ and
 ~buffer-info~ are way too large.
 #+BEGIN_SRC elisp

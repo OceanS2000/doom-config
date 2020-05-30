@@ -112,21 +112,15 @@ Note that this feature is available only with emacs-25+."
       ;; Fallback to default when frames are not usable.
       (helm-default-display-buffer buffer)
     (setq helm--buffer-in-new-frame-p t)
-    (let* ((pos (window-absolute-pixel-position))
+    (let* ((relative-pos (pos-visible-in-window-p (window-point) nil t))
+           (window-edge (window-body-pixel-edges))
+           (pos-x (+ (nth 0 relative-pos) (nth 0 window-edge)))
+           (pos-y (+ (nth 1 relative-pos) (nth 1 window-edge)))
            (half-screen-size (/ (display-pixel-height x-display-name) 2))
            (frame-info (frame-geometry))
            (prmt-size (length helm--prompt))
            (line-height (frame-char-height))
            (right-bound (cadr (assq 'outer-size frame-info)))
-           (frame-left (if (< (+ (car pos) (* (frame-char-width) helm-display-buffer-width))
-                              right-bound)
-                           (- (car pos)
-                              (* (frame-char-width)
-                                 (if (< (- (point) (point-at-bol)) prmt-size)
-                                     (- (point) (point-at-bol))
-                                   prmt-size)))
-                         (- right-bound (* (frame-char-width)
-                                           (+ 2 helm-display-buffer-width)))))
            tab-bar-mode
            (default-frame-alist
              (if resume
@@ -136,19 +130,24 @@ Note that this feature is available only with emacs-25+."
                  (width . ,helm-display-buffer-width)
                  (height . ,helm-display-buffer-height)
                  (tool-bar-lines . 0)
-                 (left . ,(if (< 0 frame-left) frame-left 0))
+                 (left . ,(max (if (< (+ pos-x (* (frame-char-width) helm-display-buffer-width))
+                                      right-bound)
+                                   (- pos-x (* (frame-char-width) prmt-size))
+                                 (- right-bound (* (frame-char-width)
+                                                   (+ 2 helm-display-buffer-width))))
+                               0))
                  ;; Try to put frame at the best possible place.
                  ;; Frame should be below point if enough
                  ;; place, otherwise above point and
                  ;; current line should not be hidden
                  ;; by helm frame.
-                 (top . ,(if (> (cdr pos) half-screen-size)
+                 (top . ,(if (> pos-y half-screen-size)
                              ;; Above point
-                             (- (cdr pos)
+                             (- pos-y
                                 ;; add 1 lines to make sure there is always a gap
                                 (* (+ helm-display-buffer-height 1) line-height))
                            ;; Below point
-                           (+ (cdr pos) line-height)))
+                           (+ pos-y line-height)))
                  (title . "Helm")
                  (undecorated . ,helm-use-undecorated-frame-option)
                  (background-color . ,(or helm-frame-background-color
@@ -174,7 +173,7 @@ Note that this feature is available only with emacs-25+."
         (add-hook 'helm-minibuffer-set-up-hook 'helm-hide-minibuffer-maybe)
         (with-helm-buffer
           (setq-local helm-echo-input-in-header-line
-                      (not (> (cdr pos) half-screen-size)))))
+                      (not (> pos-y half-screen-size)))))
       (helm-display-buffer-popup-frame buffer default-frame-alist)
       ;; When frame size have been modified manually by user restore
       ;; it to default value unless resuming or not using

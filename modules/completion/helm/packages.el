@@ -10,8 +10,6 @@
 (package! helm-projectile)
 (when (featurep! +fuzzy)
   (package! helm-flx))
-(when (featurep! +childframe)
-  (package! posframe))
 (when (featurep! :lang org)
   (package! helm-org))
 (package! helm-descbinds)
