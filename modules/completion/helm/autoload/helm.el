@@ -185,3 +185,51 @@ Note that this feature is available only with emacs-25+."
                         helm-display-buffer-width
                         helm-display-buffer-height)))
     (helm-log-run-hook 'helm-window-configuration-hook)))
+
+;;; Unicode
+
+(defun +helm--unicode-names ()
+  "Return sorted (DISPLAY . ACTUAL) of function `ucs-names'.
+The result of function `ucs-names' is mostly, but not completely,
+sorted, so this function ensures lexicographic order."
+  (let* (cands
+         (table (ucs-names))            ; Either hash map or alist
+         (fmt (lambda (name code)       ; Common format function
+                (let ((cand (format "%06X %-58s %c" code name code)))
+                  (push `(,cand . ,code) cands))))
+         (sortp (lambda (a b)
+                  (string-lessp (car a) (car b)))))
+    (if (not (hash-table-p table))
+        ;; Support `ucs-names' returning an alist in Emacs < 26.
+        ;; The result of `ucs-names' comes pre-reversed so no need to repeat.
+        (dolist (entry table)
+          (funcall fmt (car entry) (cdr entry)))
+      (maphash fmt table)
+      ;; Reverse to speed up sorting
+      (setq cands (nreverse cands)))
+    (sort cands sortp)))
+
+(defvar +helm--unicode-source
+  (helm-build-sync-source "Unicode Characters"
+    :candidates (+helm--unicode-names)
+    :action (helm-make-actions
+             "Insert" (lambda (char)
+                        (let ((copy (cond
+                                     ((listp helm-current-prefix-arg)
+                                      (car helm-current-prefix-arg))
+                                     (helm-current-prefix-arg))))
+                          (insert-char char copy)))
+             "Insert code" (lambda (code)
+                             (insert (format "%X" code))))
+    :keymap helm-M-x-map)
+  "Source for `+helm/unicode'")
+
+;;;###autoload
+(defun +helm/unicode ()
+  "Insert unicode char with helm"
+  (interactive)
+  (let ((helm--mode-line-display-prefarg t))
+    (helm :sources '(+helm--unicode-source)
+          :prompt "Character name: "
+          :buffer "*helm unicode characters*")
+    (setq helm--mode-line-display-prefarg nil)))

@@ -146,7 +146,7 @@ EMACS 27 we have HarfBuzz support.
         . (lambda () (setq-local composition-function-table composition-ligature-table))))
       :config
       ;; support ligatures, some toned down to prevent hang
-      (when (version<= "27.0" emacs-version)
+      (when EMACS28+
         (let ((alist
                '((?!  . "\\(?:!\\(?:===?\\|[!=]\\)\\)")
                  (?*  . "\\(?:\\*\\(?:\\*[*/]\\|[)*/>]\\)?\\)")                            ; (regexp-opt '("*" "**" "***" "**/" "*/" "*>" "*)"))
@@ -176,10 +176,31 @@ EMACS 27 we have HarfBuzz support.
           (dolist (char-regexp alist)
             (set-char-table-range composition-ligature-table (car char-regexp)
                                   `([,(cdr char-regexp) 0 font-shape-gstring]))))
-        (set-char-table-parent composition-ligature-table composition-function-table)))
+        (unless (char-table-parent composition-ligature-table)
+          (set-char-table-parent composition-ligature-table composition-function-table))))
 
 (if (fboundp 'mac-auto-operator-composition-mode)
     (mac-auto-operator-composition-mode +1))
+#+END_SRC
+
+Some emojis are actually ligatures, we need some setup to make them display appropriately.
+#+BEGIN_SRC elisp
+(when EMACS28+
+  ;; Complex family emojis
+  (set-char-table-range
+   composition-function-table
+   8205 `([,(format "\\(.\\(%c.[%c-%c]?%c?\\)*\\)"
+                    8205 127995 127999 65039) 1 font-shape-gstring]))
+  ;; Emoji with different skin color
+  (set-char-table-range
+   composition-function-table
+   '(127995 . 127999) `([,(format "\\(.[%c-%c]\\(%c.[%c-%c]?%c?\\)*\\)"
+                                  127995 127999 8205 127995 127999 65039) 1 font-shape-gstring]))
+  ;; Flags
+  (set-char-table-range
+   composition-function-table
+   '(127462 . 127487) `([,(format "\\([%c-%c]\\{2\\}\\)"
+                                  127462 127487) 0 font-shape-gstring])))
 #+END_SRC
 
 * Key Bindings
@@ -230,8 +251,15 @@ To avoid fuzzy latex preview we should use `dvisvgm` as previewer.
       org-preview-latex-default-process 'dvisvgm)
 #+END_SRC
 
+Why doom believes it is a good idea to make ~org-cycle~ only cycle current
+headline? It already has =z a= for this, and the recursive cycle is better for
+me.
+#+BEGIN_SRC elisp
+(remove-hook 'org-tab-first-hook #'+org-cycle-only-current-subtree-h)
+#+END_SRC
+
 * LSP
-We have used a customed ~ccls~ binary, so we need to make emacs find it.
+We have used a self-compiled ~ccls~ binary, so we need to make Emacs find it.
 #+BEGIN_SRC elisp
 (setq ccls-executable "/Users/sao/.local/bin/ccls")
 (after! ccls
@@ -330,7 +358,10 @@ Deleting should be put into trash if we are using macOS (as it is *always*
 available)
 #+BEGIN_SRC elisp
 (when IS-MAC
-  (setq delete-by-moving-to-trash t))
+  (use-package! osx-trash
+    :config
+    (osx-trash-setup)))
+(setq delete-by-moving-to-trash t)
 #+END_SRC
 
 * TeX & LaTeX
@@ -360,10 +391,12 @@ If we have x widget support, in most cases we prefer embedded web view.
 Make we preview buffer when we are switching buffers.
 #+BEGIN_SRC elisp
 (after! ivy
-  (defadvice! ivy--evil-split-prompt-for-buffer (&rest _)
-    :after '(evil-window-split evil-window-vsplit)
-    (+ivy/switch-buffer))
-  (setq +ivy-buffer-preview t))
+  ;; REVIEW: Even if you are using helm, it looks like ivy is still loaded
+  (when (featurep! :complection ivy)
+    (defadvice! ivy--evil-split-prompt-for-buffer (&rest _)
+      :after '(evil-window-split evil-window-vsplit)
+      (+ivy/switch-buffer))
+    (setq +ivy-buffer-preview t)))
 #+END_SRC
 
 Remove annoying length change of popup frame.
@@ -386,6 +419,14 @@ Remove annoying length change of popup frame.
 #+END_SRC
 
 * Helm
+Make we preview buffer when we are switching buffers.
+#+BEGIN_SRC elisp
+(after! helm-mode
+  (defadvice! helm--evil-split-prompt-for-buffer (&rest _)
+    :after '(evil-window-split evil-window-vsplit)
+    (+helm/workspace-mini)))
+#+END_SRC
+
 Some key bindings.
 #+BEGIN_SRC elisp :tangle no
 (defun helm-multi-swoop--exec-interactive ()
@@ -421,130 +462,156 @@ Some key bindings.
       )
 #+END_SRC
 
-Doom has done too much to disable helm's own good behaviour.
-#+BEGIN_SRC elisp :tangle no
-(when (featurep! :completion helm)
-  (setq helm-default-display-buffer-functions nil
-        helm-display-header-line t
-        helm-display-buffer-default-height 17
-        helm-display-buffer-width 96
-        helm-split-window-inside-p t
-        helm-display-function #'helm-display-buffer-in-posframe
-        helm-ff-auto-update-initial-value t)
-  (set-popup-rule! "^\\*helm" :ignore t))
-(after! helm
-  (remove-hook 'helm-after-initialize-hook #'+helm--hide-mode-line)
-  (advice-remove 'helm-display-mode-line #'+helm--hide-mode-line)
-  (advice-remove 'helm-ag-show-status-default-modeline #'ignore)
-  (advice-remove 'helm-describe-function 'doom-use-helpful-a)
-  (advice-remove 'helm-describe-variable 'doom-use-helpful-a)
-  (setq helm-describe-function-function #'helpful-function
-        helm-describe-variable-function #'helpful-variable))
-#+END_SRC
 
-Make ~helm-display-buffer-in-own-frame~ respect ~doom-font~.
-#+BEGIN_SRC elisp :tangle no
-(when (featurep! :completion helm)
-  (defun helm-display-buffer-in-posframe (buffer &optional resume)
-    "Display helm buffer BUFFER in a separate frame.
-
-Function suitable for `helm-display-function',
-`helm-completion-in-region-display-function'
-and/or `helm-show-completion-default-display-function'.
-
-See `helm-display-buffer-height' and `helm-display-buffer-width' to
-configure frame size.
-
-Note that this feature is available only with emacs-25+."
-    (cl-assert (and (fboundp 'window-absolute-pixel-edges)
-                    (fboundp 'frame-geometry))
-               nil "Helm buffer in own frame is only available starting at emacs-25+")
-    (if (not (display-graphic-p))
-        ;; Fallback to default when frames are not usable.
-        (helm-default-display-buffer buffer)
-      (setq helm--buffer-in-new-frame-p t)
-      (let* ((pos (window-absolute-pixel-position))
-             (half-screen-size (/ (display-pixel-height x-display-name) 2))
-             (frame-info (frame-geometry))
-             (prmt-size (length helm--prompt))
-             (line-height (frame-char-height))
-             (right-bound (cadr (assq 'outer-size frame-info)))
-             (frame-left (if (< (+ (car pos) (* (frame-char-width) helm-display-buffer-width))
-                                right-bound)
-                             (- (car pos)
-                                (* (frame-char-width)
-                                   (if (< (- (point) (point-at-bol)) prmt-size)
-                                       (- (point) (point-at-bol))
-                                     prmt-size)))
-                           (- right-bound (* (frame-char-width)
-                                             (+ 2 helm-display-buffer-width)))))
-             tab-bar-mode
-             (default-frame-alist
-               (if resume
-                   (buffer-local-value 'helm--last-frame-parameters
-                                       (get-buffer buffer))
-                 `((font . ,(font-xlfd-name doom-font))
-                   (width . ,helm-display-buffer-width)
-                   (height . ,helm-display-buffer-height)
-                   (tool-bar-lines . 0)
-                   (left . ,frame-left)
-                   ;; Try to put frame at the best possible place.
-                   ;; Frame should be below point if enough
-                   ;; place, otherwise above point and
-                   ;; current line should not be hidden
-                   ;; by helm frame.
-                   (top . ,(if (> (cdr pos) half-screen-size)
-                               ;; Above point
-                               (- (cdr pos)
-                                  ;; add 1 lines to make sure there is always a gap
-                                  (* (+ helm-display-buffer-height 1) line-height))
-                             ;; Below point
-                             (+ (cdr pos) line-height)))
-                   (title . "Helm")
-                   (undecorated . ,helm-use-undecorated-frame-option)
-                   (background-color . ,(or helm-frame-background-color
-                                            (face-attribute 'default :background)))
-                   (foreground-color . ,(or helm-frame-foreground-color
-                                            (face-attribute 'default :foreground)))
-                   (alpha . ,(or helm-frame-alpha 100))
-                   (vertical-scroll-bars . nil)
-                   (menu-bar-lines . 0)
-                   (fullscreen . nil)
-                   (visibility . ,(null helm-display-buffer-reuse-frame))
-                   (minibuffer . t)
-                   (parent-frame . (window-frame)))))
-             display-buffer-alist)
-        ;; Display minibuffer above or below only in initial session,
-        ;; not on a session triggered by action, this way if user have
-        ;; toggled minibuffer and header-line manually she keeps this
-        ;; setting in next action.
-        (unless (or helm--executing-helm-action resume)
-          ;; Add the hook inconditionally, if
-          ;; helm-echo-input-in-header-line is nil helm-hide-minibuffer-maybe
-          ;; will have anyway no effect so no need to remove the hook.
-          (add-hook 'helm-minibuffer-set-up-hook 'helm-hide-minibuffer-maybe)
-          (with-helm-buffer
-            (setq-local helm-echo-input-in-header-line
-                        (not (> (cdr pos) half-screen-size)))))
-        (helm-display-buffer-popup-frame buffer default-frame-alist)
-        ;; When frame size have been modified manually by user restore
-        ;; it to default value unless resuming or not using
-        ;; `helm-display-buffer-reuse-frame'.
-        ;; This have to be done AFTER raising the frame otherwise
-        ;; minibuffer visibility is lost until next session.
-        (unless (or resume (not helm-display-buffer-reuse-frame))
-          (set-frame-size helm-popup-frame
-                          helm-display-buffer-width
-                          helm-display-buffer-height)))
-      (helm-log-run-hook 'helm-window-configuration-hook))))
-#+END_SRC
-
-Doom's default helm settings make no sense...
-#+BEGIN_SRC elisp :tangle no
-(use-package! swiper-helm
-  :bind ([remap swiper] . #'swiper-helm)
+* Pyim
+#+BEGIN_SRC elisp
+(use-package! pyim
+  :ensure nil
+  :demand t
+  :init
   :config
-  (setq swiper-helm-display-function #'swiper-helm-default-display-buffer))
+  ;; 激活 basedict 拼音词库，五笔用户请继续阅读 README
+  (use-package pyim-basedict
+    :ensure nil
+    :config (pyim-basedict-enable))
+
+  (setq default-input-method "pyim"
+        pyim-dcache-directory (expand-file-name "pyim/dcache" doom-cache-dir)
+        pyim-default-scheme 'daniu-shuangpin)
+
+  ;; 设置 pyim 探针设置，这是 pyim 高级功能设置，可以实现 *无痛* 中英文切换 :-)
+  (setq-default pyim-english-input-switch-functions
+                '(pyim-probe-dynamic-english
+                  pyim-probe-isearch-mode
+                  pyim-probe-program-mode
+                  pyim-probe-org-structure-template
+                  pyim-probe-evil-normal-mode))
+
+  (setq-default pyim-punctuation-half-width-functions
+                '(pyim-probe-punctuation-line-beginning
+                  pyim-probe-punctuation-after-punctuation))
+
+  (pyim-isearch-mode 1)
+
+  (setq pyim-page-tooltip 'posframe)
+
+  (setq pyim-page-length 5)
+
+  :bind
+(("M-j" . pyim-convert-string-at-point)))
+#+END_SRC
+
+Custom input scheme setup
+#+BEGIN_SRC elisp
+(after! pyim
+  (pyim-scheme-add
+   '(daniu-shuangpin
+     :docuemnt "大牛双拼方案"
+     :class shuangpin
+     :first-chars "abcdefghijklmnopqrstuvwxyz"
+     :rest-chars "abcdefghijklmnopqrstuvwxyz"
+     :prefer-trigger-chars nil
+     :keymaps
+     (("q" "q" "ua" "ian")
+      ("w" "w" "ei" "vn")
+      ("e" "" "e")
+      ("r" "r" "ou")
+      ("t" "t" "iu")
+      ("y" "y" "un")
+      ("u" "sh" "er" "u")
+      ("i" "ch" "i")
+      ("o" "zh" "uo" "o")
+      ("p" "p" "ie")
+      ("a" "zh" "a")
+      ("s" "s" "ao")
+      ("d" "d" "an")
+      ("f" "f" "ang")
+      ("g" "g" "uai" "ing")
+      ("h" "h" "ai" "ue")
+      ("j" "j" "eng" "van")
+      ("k" "k" "en" "ia")
+      ("l" "l" "ong" "iong")
+      ("z" "z" "uan")
+      ("x" "x" "ue" "uang")
+      ("c" "c" "ian")
+      ("v" "sh" "ui" "v")
+      ("b" "b" "in")
+      ("g" "g" "uai" "ing")
+      ("h" "h" "ai" "ue")
+      ("j" "j" "eng" "van")
+      ("k" "k" "en" "ia")
+      ("l" "l" "ong" "iong")
+      ("z" "z" "uan")
+      ("x" "x" "ue" "uang")
+      ("c" "c" "ian")
+      ("v" "sh" "ui" "v")
+      ("b" "b" "in")
+      ("n" "n" "ui" "iang")
+      ("m" "m" "iao")))))
+#+END_SRC
+
+* Telega
+#+BEGIN_SRC elisp
+(use-package! telega
+  :commands (telega)
+  :defer t
+  :bind ("C-c t" . #'telega)
+  :init
+  (unless (display-graphic-p) (setq telega-use-images nil))
+  (setq telega-directory (expand-file-name "telega" doom-etc-dir)
+        telega-cache-dir (expand-file-name "telega/cache" doom-cache-dir)
+        telega-temp-dir (expand-file-name "telega/temp" doom-cache-dir))
+  :hook
+  ('telega-root-mode . #'evil-emacs-state)
+  ('telega-chat-mode . #'evil-emacs-state)
+  ('telega-chat-mode . #'yas-minor-mode)
+  ('telega-chat-mode . (lambda ()
+                         (set-company-backend! 'telega-chat-mode
+                           (append '(telega-company-emoji
+                                     telega-company-username
+                                     telega-company-hashtag)
+                                   (when (telega-chat-bot-p telega-chatbuf--chat)
+                                     '(telega-company-botcmd))))
+                         (company-mode 1)))
+  ('telega-chat-pre-message . #'telega-msg-ignore-blocked-sender)
+  :config
+  (setq telega-proxies
+        (list '(:server "127.0.0.1" :port 6153 :enable t
+                :type (:@type "proxyTypeSocks5")))
+        telega-completing-read-function
+        (cond ((featurep! :completion helm)
+               ;; `helm-mode' ensures this using helm
+               'completing-read)
+              ((featurep! :completion ivy)
+               'ivy-completing-read)
+              (t 'ido-completing-read)))
+  (set-popup-rule! "^\\*Telega Root"
+    :side 'right :size 83 :quit 'current :ttl nil :modeline t)
+  (set-popup-rule! "^◀\\(\\[\\|<\\|{\\).*\\(\\]\\|>\\|}\\)"
+    :ignore t)
+  (telega-mode-line-mode 1)
+  (after! all-the-icons
+    (add-to-list 'all-the-icons-mode-icon-alist
+                 '(telega-root-mode all-the-icons-fileicon "telegram"
+                                    :heigt 1.0
+                                    :v-adjust -0.2
+                                    :face all-the-icons-yellow))
+    (add-to-list 'all-the-icons-mode-icon-alist
+                 '(telega-chat-mode all-the-icons-fileicon "telegram"
+                                    :heigt 1.0
+                                    :v-adjust -0.2
+                                    :face all-the-icons-blue))
+    (defadvice! +telega-mode-line-use-text-icon-a ()
+      :override 'telega-mode-line-icon
+      (propertize
+       (if doom-modeline-icon
+           (all-the-icons-fileicon "telegram" :height 1.0 :v-adjust -0.1)
+         "Tg")
+       'face 'all-the-icons-green
+       'local-map (eval-when-compile
+                    (make-mode-line-mouse-map 'mouse-1 'telega))
+       'mouse-face 'mode-line-highlight
+       'help-echo "Click to show telega root buffer"))))
 #+END_SRC
 
 * Note in case something odd happens

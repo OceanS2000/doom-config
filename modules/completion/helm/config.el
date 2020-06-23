@@ -20,7 +20,8 @@
         [remap projectile-switch-project] #'helm-projectile-switch-project
         [remap projectile-switch-to-buffer] #'helm-projectile-switch-to-buffer
         [remap recentf-open-files]        #'helm-recentf
-        [remap yank-pop]                  #'helm-show-kill-ring)
+        [remap yank-pop]                  #'helm-show-kill-ring
+        [remap unicode-chars-list-chars]  #'+helm/unicode)
   :config
   ;; helm is too heavy for `find-file-at-point'
   (add-to-list 'helm-completing-read-handlers-alist (cons #'find-file-at-point nil)))
@@ -34,7 +35,6 @@
         helm-display-buffer-width 96
         helm-display-buffer-default-height 17
         helm-split-window-inside-p t
-        helm-display-buffer-reuse-frame t
         ;; When calling `helm-semantic-or-imenu', don't immediately jump to
         ;; symbol at point
         helm-imenu-execute-action-at-once-if-one nil)
