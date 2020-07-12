@@ -156,8 +156,6 @@ EMACS 27 we have HarfBuzz support.
                  (?/  . "\\(?:/\\(?:\\*\\*\\|//\\|==\\|[*/=>]\\)\\)")                      ; (regexp-opt '("/*" "/**" "//" "///" "/=" "/==" "/>"))
                  (?:  . "\\(?::\\(?:::\\|[+:<=>]\\)?\\)")                                  ; (regexp-opt '(":" "::" ":::" ":=" ":<" ":=" ":>" ":+"))
                  (?\; . ";;")                                                              ; (regexp-opt '(";;"))
-                 (?0  . "0\\(?:\\(x[a-fA-F0-9]\\).?\\)") ; Tries to match the x in 0xDEADBEEF
-                 ;; (?x . "x") ; Also tries to match the x in 0xDEADBEEF
                  ;; (regexp-opt '("<!--" "<$" "<$>" "<*" "<*>" "<**>" "<+" "<+>" "<-" "<--" "<---" "<->" "<-->" "<--->" "</" "</>" "<<" "<<-" "<<<" "<<=" "<=" "<=<" "<==" "<=>" "<===>" "<>" "<|" "<|>" "<~" "<~~" "<." "<.>" "<..>"))
                  (?<  . "\\(?:<\\(?:!--\\|\\$>\\|\\*\\(?:\\*?>\\)\\|\\+>\\|-\\(?:-\\(?:->\\|[>-]\\)\\|[>-]\\)\\|\\.\\(?:\\.?>\\)\\|/>\\|<[<=-]\\|=\\(?:==>\\|[<=>]\\)\\||>\\|~~\\|[$*+./<=>|~-]\\)\\)")
                  (?=  . "=+>?")
@@ -255,7 +253,8 @@ Why doom believes it is a good idea to make ~org-cycle~ only cycle current
 headline? It already has =z a= for this, and the recursive cycle is better for
 me.
 #+BEGIN_SRC elisp
-(remove-hook 'org-tab-first-hook #'+org-cycle-only-current-subtree-h)
+(after! evil-org
+  (remove-hook 'org-tab-first-hook #'+org-cycle-only-current-subtree-h))
 #+END_SRC
 
 * LSP
@@ -418,13 +417,20 @@ Remove annoying length change of popup frame.
   (ivy-rich-mode +1))
 #+END_SRC
 
+Avoid showing helm completion buffer
+#+BEGIN_SRC elisp
+(after! ivy
+  (add-to-list 'ivy-ignore-buffers "\\`\\*helm"))
+#+END_SRC
+
 * Helm
 Make we preview buffer when we are switching buffers.
 #+BEGIN_SRC elisp
 (after! helm-mode
   (defadvice! helm--evil-split-prompt-for-buffer (&rest _)
     :after '(evil-window-split evil-window-vsplit)
-    (+helm/workspace-mini)))
+    (+helm/workspace-mini))
+  (setq helm-default-display-buffer-functions nil))
 #+END_SRC
 
 Some key bindings.
@@ -432,9 +438,9 @@ Some key bindings.
 (defun helm-multi-swoop--exec-interactive ()
   (interactive)
   (helm-exit-and-execute-action 'helm-multi-swoop--exec))
-(map! :map 'helm-multi-swoop-buffers-map
+(map! :map helm-multi-swoop-buffers-map
       :ni "RET" 'helm-multi-swoop--exec-interactive)
-(map! :map 'helm-map
+(map! :map helm-map
       :n "m" 'helm-toggle-visible-mark
       :n "<tab>" 'helm-select-action
       :n "[[" 'helm-previous-source
@@ -458,161 +464,13 @@ Some key bindings.
 
       :ni "RET" 'helm-maybe-exit-minibuffer
       :ni "M-v" 'helm-previous-page
-      :ni "C-v" 'helm-next-page
-      )
+      :ni "C-v" 'helm-next-page)
+(after! counsel
+  (map! [remap apropos]  #'helm-apropos
+        [remap yank-pop] #'helm-show-kill-ring))
+
 #+END_SRC
 
-
-* Pyim
-#+BEGIN_SRC elisp
-(use-package! pyim
-  :ensure nil
-  :demand t
-  :init
-  :config
-  ;; 激活 basedict 拼音词库，五笔用户请继续阅读 README
-  (use-package pyim-basedict
-    :ensure nil
-    :config (pyim-basedict-enable))
-
-  (setq default-input-method "pyim"
-        pyim-dcache-directory (expand-file-name "pyim/dcache" doom-cache-dir)
-        pyim-default-scheme 'daniu-shuangpin)
-
-  ;; 设置 pyim 探针设置，这是 pyim 高级功能设置，可以实现 *无痛* 中英文切换 :-)
-  (setq-default pyim-english-input-switch-functions
-                '(pyim-probe-dynamic-english
-                  pyim-probe-isearch-mode
-                  pyim-probe-program-mode
-                  pyim-probe-org-structure-template
-                  pyim-probe-evil-normal-mode))
-
-  (setq-default pyim-punctuation-half-width-functions
-                '(pyim-probe-punctuation-line-beginning
-                  pyim-probe-punctuation-after-punctuation))
-
-  (pyim-isearch-mode 1)
-
-  (setq pyim-page-tooltip 'posframe)
-
-  (setq pyim-page-length 5)
-
-  :bind
-(("M-j" . pyim-convert-string-at-point)))
-#+END_SRC
-
-Custom input scheme setup
-#+BEGIN_SRC elisp
-(after! pyim
-  (pyim-scheme-add
-   '(daniu-shuangpin
-     :docuemnt "大牛双拼方案"
-     :class shuangpin
-     :first-chars "abcdefghijklmnopqrstuvwxyz"
-     :rest-chars "abcdefghijklmnopqrstuvwxyz"
-     :prefer-trigger-chars nil
-     :keymaps
-     (("q" "q" "ua" "ian")
-      ("w" "w" "ei" "vn")
-      ("e" "" "e")
-      ("r" "r" "ou")
-      ("t" "t" "iu")
-      ("y" "y" "un")
-      ("u" "sh" "er" "u")
-      ("i" "ch" "i")
-      ("o" "zh" "uo" "o")
-      ("p" "p" "ie")
-      ("a" "zh" "a")
-      ("s" "s" "ao")
-      ("d" "d" "an")
-      ("f" "f" "ang")
-      ("g" "g" "uai" "ing")
-      ("h" "h" "ai" "ue")
-      ("j" "j" "eng" "van")
-      ("k" "k" "en" "ia")
-      ("l" "l" "ong" "iong")
-      ("z" "z" "uan")
-      ("x" "x" "ue" "uang")
-      ("c" "c" "ian")
-      ("v" "sh" "ui" "v")
-      ("b" "b" "in")
-      ("g" "g" "uai" "ing")
-      ("h" "h" "ai" "ue")
-      ("j" "j" "eng" "van")
-      ("k" "k" "en" "ia")
-      ("l" "l" "ong" "iong")
-      ("z" "z" "uan")
-      ("x" "x" "ue" "uang")
-      ("c" "c" "ian")
-      ("v" "sh" "ui" "v")
-      ("b" "b" "in")
-      ("n" "n" "ui" "iang")
-      ("m" "m" "iao")))))
-#+END_SRC
-
-* Telega
-#+BEGIN_SRC elisp
-(use-package! telega
-  :commands (telega)
-  :defer t
-  :bind ("C-c t" . #'telega)
-  :init
-  (unless (display-graphic-p) (setq telega-use-images nil))
-  (setq telega-directory (expand-file-name "telega" doom-etc-dir)
-        telega-cache-dir (expand-file-name "telega/cache" doom-cache-dir)
-        telega-temp-dir (expand-file-name "telega/temp" doom-cache-dir))
-  :hook
-  ('telega-root-mode . #'evil-emacs-state)
-  ('telega-chat-mode . #'evil-emacs-state)
-  ('telega-chat-mode . #'yas-minor-mode)
-  ('telega-chat-mode . (lambda ()
-                         (set-company-backend! 'telega-chat-mode
-                           (append '(telega-company-emoji
-                                     telega-company-username
-                                     telega-company-hashtag)
-                                   (when (telega-chat-bot-p telega-chatbuf--chat)
-                                     '(telega-company-botcmd))))
-                         (company-mode 1)))
-  ('telega-chat-pre-message . #'telega-msg-ignore-blocked-sender)
-  :config
-  (setq telega-proxies
-        (list '(:server "127.0.0.1" :port 6153 :enable t
-                :type (:@type "proxyTypeSocks5")))
-        telega-completing-read-function
-        (cond ((featurep! :completion helm)
-               ;; `helm-mode' ensures this using helm
-               'completing-read)
-              ((featurep! :completion ivy)
-               'ivy-completing-read)
-              (t 'ido-completing-read)))
-  (set-popup-rule! "^\\*Telega Root"
-    :side 'right :size 83 :quit 'current :ttl nil :modeline t)
-  (set-popup-rule! "^◀\\(\\[\\|<\\|{\\).*\\(\\]\\|>\\|}\\)"
-    :ignore t)
-  (telega-mode-line-mode 1)
-  (after! all-the-icons
-    (add-to-list 'all-the-icons-mode-icon-alist
-                 '(telega-root-mode all-the-icons-fileicon "telegram"
-                                    :heigt 1.0
-                                    :v-adjust -0.2
-                                    :face all-the-icons-yellow))
-    (add-to-list 'all-the-icons-mode-icon-alist
-                 '(telega-chat-mode all-the-icons-fileicon "telegram"
-                                    :heigt 1.0
-                                    :v-adjust -0.2
-                                    :face all-the-icons-blue))
-    (defadvice! +telega-mode-line-use-text-icon-a ()
-      :override 'telega-mode-line-icon
-      (propertize
-       (if doom-modeline-icon
-           (all-the-icons-fileicon "telegram" :height 1.0 :v-adjust -0.1)
-         "Tg")
-       'face 'all-the-icons-green
-       'local-map (eval-when-compile
-                    (make-mode-line-mouse-map 'mouse-1 'telega))
-       'mouse-face 'mode-line-highlight
-       'help-echo "Click to show telega root buffer"))))
-#+END_SRC
 
 * Note in case something odd happens
 - To have a good unicode font, layer `unicode` may be installed

@@ -209,6 +209,7 @@ sorted, so this function ensures lexicographic order."
       (setq cands (nreverse cands)))
     (sort cands sortp)))
 
+(require 'helm-command)
 (defvar +helm--unicode-source
   (helm-build-sync-source "Unicode Characters"
     :candidates (+helm--unicode-names)

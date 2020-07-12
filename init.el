@@ -1,16 +1,15 @@
 ;;; init.el -*- lexical-binding: t; -*-
 
 ;; After modifing eval the following sexp to pretty align comments
-;; (progn (search-forward "(doom!") (let* ((beg (goto-char (match-beginning 0))) (end (scan-sexps beg 1))) (align-regexp beg end "\\(\\s-*[^;]\\);[^;]+$")))
+;; (progn (search-forward "(doom!") (let* ((beg (goto-char (match-beginning 0))) (end (scan-sexps beg 1))) (align-regexp beg end "\\(\\s-*[^;]\\);[^;]*$")))
 
 (doom! :input
-       ;;chinese
+       (chinese +childframe)
        ;;japanese
 
        :completion
        (company +childframe)        ; the ultimate code completion backend
-       ;;helm                       ; the other search engine for love and live
-       (helm +childframe)           ; the *other* search engine for love and live
+       helm                         ; the *other* search engine for love and live
        ;;ido                        ; the other *other* search engine...
        (ivy +prescient +childframe) ; a search engine for love and life
 
@@ -118,12 +117,15 @@
        (go +lsp)                    ; the hipster dialect
        ;;(haskell +intero)          ; a language that's lazier than I am
        ;;hy                         ; readability of scheme w/ speed of python
-       ;;idris                  ;
+       ;;idris                      ;
        ;;(java +meghanada)          ; the poster child for carpal tunnel syndrome
        ;;javascript                 ; all(hope(abandon(ye(who(enter(here))))))
        ;;julia                      ; a better, faster MATLAB
        ;;kotlin                     ; a better, slicker Java(Script)
-       latex                        ; writing papers in Emacs has never been so fun
+       (latex                       ; writing papers in Emacs has never been so fun
+        +cdlatex                    ; math symbols made easy
+        +fold                       ; latex, but with better symbols
+        +latexmk)
        ;;lean
        ;;factor
        ;;ledger                     ; an accounting system in Emacs
@@ -172,6 +174,7 @@
        ;;irc                        ; how neckbeards socialize
        ;;(rss +org)                 ; emacs as an RSS reader
        ;;twitter                    ; twitter client https://twitter.com/vnought
+       telega                       ; telegram client on emacs
 
        :config
        ;; For literate config users. This will tangle+compile a config.org
@@ -188,7 +191,7 @@
 ;; (setq ns-use-native-fullscreen t)
 
 ;; Workaround a bug of straight build of proof-general
-(setq pg-init--script-full-path "~/.config/emacs.d/.local/straight/build/proof-general/")
+(setq pg-init--pg-root "~/.config/emacs.d/.local/straight/build/proof-general/")
 
 ;; We want evil in minibuffer
 (setq evil-collection-setup-minibuffer nil)

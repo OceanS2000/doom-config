@@ -84,7 +84,8 @@
   ;; Use helpful instead of describe-* to display documentation
   (setq helm-describe-function-function #'helpful-function
         helm-describe-variable-function #'helpful-variable)
-  (set-popup-rule! "^\\*helm" :ignore t))
+
+  (set-popup-rule! "^\\*[Hh]elm" :ignore t))
 
 
 (use-package! helm-flx
