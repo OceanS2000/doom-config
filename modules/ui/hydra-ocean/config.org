@@ -1,0 +1,169 @@
+#+TITLE: hydra-ocean source code
+#+AUTHOR: OceanS2000 <sao@saoblog.tech>
+#+STARTUP: contents
+
+This file contains all =hydra-ocean= source code, written in org-babel literate
+programming format.
+
+* Table of Contents :TOC_3:noexport:
+- [[#hydra-package-load][Hydra package load]]
+- [[#hydras-born][Hydras born]]
+  - [[#window-manipulation][Window manipulation]]
+    - [[#look-of-the-hydra][Look of the Hydra]]
+    - [[#the-keybindings][The keybindings]]
+  - [[#pdf-tools][pdf-tools]]
+    - [[#how-does-hydra-looks][How does hydra looks?]]
+    - [[#key-bindings][Key bindings]]
+- [[#hydra-dooms][Hydra dooms]]
+
+* Hydra package load
+Let's get every file in its place!
+
+#+BEGIN_SRC elisp :tangle packages.el
+;;; ui/hydra-ocean/packages.el -*- lexical-binding: t; -*-
+
+(package! hydra)
+#+END_SRC
+
+#+BEGIN_SRC elisp :tangle config.el
+;;; ui/hydra-ocean/config.el -*- lexical-binding: t; -*-
+
+(use-package! hydra
+  :config
+  (setq lv-use-separator t
+        hydra-look-for-remap t))
+#+END_SRC
+
+* Hydras born
+#+BEGIN_SRC elisp :tangle autoload/windows.el :noweb no-export :lexical yes
+;;; ui/hydra-ocean/autoload/windows.el -*- lexical-binding: t; -*-
+
+;;;###autoload (autoload '+hydra-ocean/windows/body "ui/hydra-ocean/autoload/windows" nil t)
+(defhydra +hydra-ocean/windows (:hint nil)
+<<window-hydra-def>>
+  )
+#+END_SRC
+
+#+RESULTS:
+: +hydra-ocean/windows/body
+
+#+BEGIN_SRC elisp :tangle autoload/pdf.el :noweb no-export :lexical yes
+;;; ui/hydra-ocean/autoload/pdf.el -*- lexical-binding: t; -*-
+
+;;;###autoload (autoload '+hydra-ocean/pdf/body "ui/hydra-ocean/autoload/pdf" nil t)
+(defhydra +hydra-ocean/pdf (:hint nil :color blue)
+<<pdf-hydra-def>>
+  )
+#+END_SRC
+
+#+RESULTS:
+: +hydra-ocean/pdf/body
+
+** Window manipulation
+:PROPERTIES:
+:header-args: :noweb-ref window-hydra-def
+:END:
+
+*** Look of the Hydra
+#+BEGIN_SRC elisp
+"
+                                                                       ╔════════╗
+   select/Movement  ^^^^^^^^^Resize - +                                         ║ Window ║
+  ─────────────────────────────────────────────────────────────────────╨────────╜
+  ^^^^      _k_/_K_          wid[|] _,_ _._      [_s_][_v_]: split horizontal/vertical
+  ^^^^      ^^ ↑ ^^          hei[_] _-_ _=_      [_r_][_R_]: rotate downward/upward
+  _h_/_H_ ← _w_/_W_ → _l_/_L_       set
+  ^^^^      ^^ ↓ ^^
+  ^^^^      _j_/_J_  _b_ottom
+  ╭─────────────────────────────────────────────────────────────────────────────╯
+                 [_c_]: close window      [_q_]: quit
+"
+#+END_SRC
+
+*** The keybindings
+#+BEGIN_SRC elisp
+("h" #'evil-window-left)
+("j" #'evil-window-down)
+("k" #'evil-window-up)
+("l" #'evil-window-right)
+("H" #'+evil/window-move-left)
+("J" #'+evil/window-move-down)
+("K" #'+evil/window-move-up)
+("L" #'+evil/window-move-right)
+("b" #'evil-window-bottom)
+("c" #'evil-window-delete)
+("," #'evil-window-decrease-width)
+("." #'evil-window-increase-width)
+("-" #'evil-window-decrease-height)
+("=" #'evil-window-increase-height)
+("s" #'evil-window-split)
+("v" #'evil-window-vsplit)
+("r" #'evil-window-rotate-downwards)
+("R" #'evil-window-rotate-upwards)
+("w" #'ace-window)
+("W" #'ace-swap-window)
+("q" nil)
+#+END_SRC
+
+** pdf-tools
+*** How does hydra looks?
+#+BEGIN_SRC elisp :noweb-ref pdf-hydra-def
+"
+                                                                      ╔═══════════╗
+       Move  History   Scale/Fit     Annotations  Search/Link    Do   ║ PDF Tools ║
+   ╭──────────────────────────────────────────────────────────────────╨───────────╜
+         ^^_g_^^      _K_    ^↧^    _+_    ^ ^     [_al_] list    [_s_] search    [_u_] revert buffer
+         ^^^↑^^^      ^↑^    _H_    ^↑^  ↦ _W_ ↤   [_am_] markup  [_o_] outline   [_i_] info
+         ^^_k_^^      ^ ^    ^↥^    _0_    ^ ^     [_at_] text    [_F_] link      [_d_] dark mode
+         ^^^↑^^^      ^↓^  ╭─^─^─┐  ^↓^  ╭─^ ^─┐   [_ad_] delete  [_f_] search link
+    _h_ ←pag_e_→ _l_  _J_  │ _P_ │  _-_    _b_     [_aa_] dired
+         ^^^↓^^^      ^ ^  ╰─^─^─╯  ^ ^  ╰─^ ^─╯   [_y_]  yank
+         ^^_j_^^      ^ ^  _r_eset slice box
+         ^^^↓^^^
+         ^^_G_^^
+  ╭───────────────────────────────────────────────────────────────────────────────╯
+                                       [_q_]: Quit
+"
+#+END_SRC
+
+*** Key bindings
+#+BEGIN_SRC elisp :noweb-ref pdf-hydra-def
+("q" nil)
+("al" pdf-annot-list-annotations)
+("ad" pdf-annot-delete)
+("aa" pdf-annot-attachment-dired)
+("am" pdf-annot-add-markup-annotation)
+("at" pdf-annot-add-text-annotation)
+("y"  pdf-view-kill-ring-save)
+("+" pdf-view-enlarge :color red)
+("-" pdf-view-shrink :color red)
+("0" pdf-view-scale-reset)
+("H" pdf-view-fit-height-to-window)
+("W" pdf-view-fit-width-to-window)
+("P" pdf-view-fit-page-to-window)
+("j" pdf-view-next-page-command :color red)
+("k" pdf-view-previous-page-command :color red)
+("d" pdf-view-dark-minor-mode)
+("b" pdf-view-set-slice-from-bounding-box)
+("r" pdf-view-reset-slice)
+("g" pdf-view-first-page)
+("G" pdf-view-last-page)
+("e" pdf-view-goto-page)
+("o" pdf-outline)
+("s" pdf-occur)
+("i" pdf-misc-display-metadata)
+("u" pdf-view-revert-buffer)
+("F" pdf-links-action-perfom)
+("f" pdf-links-isearch-link)
+("K" pdf-history-backward :color red)
+("J" pdf-history-forward :color red)
+("l" image-forward-hscroll :color red)
+("h" image-backward-hscroll :color red)
+#+END_SRC
+
+* Hydra dooms
+#+BEGIN_SRC elisp :tangle config.el
+(map! (:map pdf-view-mode-map
+        :localleader
+        "m" #'+hydra-ocean/pdf/body))
+#+END_SRC

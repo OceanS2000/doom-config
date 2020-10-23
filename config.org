@@ -6,6 +6,8 @@
 
 * User name and date
 #+BEGIN_SRC elisp
+(setq user-full-name "Ao Shen"
+      user-mail-address "shenao6626@gmail.com")
 #+END_SRC
 
 * Look and Feel
@@ -13,6 +15,15 @@ We have to get font and window look correct, but it is hard than I thought.
 #+BEGIN_SRC elisp
 (setq doom-font       (font-spec :family "Sarasa Term Slab CL" :size 14)
       doom-serif-font (font-spec :family "Sarasa Term CL"   :size 14))
+(defadvice! +doom-setup-cjk-font-a (&optional frame)
+  "HACK: Setup font for cjk charsets again to avoid performance
+problems introduced by doom's stack symbol fonts into default
+fontset"
+  :after 'doom-init-extra-fonts-h
+  (dolist (charset '(kana han cjk-misc bopomofo))
+    (set-fontset-font (frame-parameter frame 'font)
+                      charset
+                      (font-spec :family "Sarasa Term Slab CL" :size 14))))
 #+END_SRC
 
 If started in window system, make it full screen.
@@ -233,6 +244,13 @@ WARNING: This buffer has no auto-save functionality"
 Some of major mode need to be added in ~evil-motion-maps~ as default
 configuration does not provides them.
 #+BEGIN_SRC elisp
+(setq evil-collection-setup-minibuffer t)
+;; I don't know what doom is messing around but `evil-want-Y-yank-to-eol' seems
+;; not working anymore.
+(after! evil
+  (evil-add-command-properties
+   'evil-yank-line
+   :motion 'evil-end-of-line-or-visual-line))
 (after! osx-dictionary
   (add-to-list 'evil-motion-state-modes 'osx-dictionary-mode))
 #+END_SRC
@@ -247,6 +265,7 @@ To avoid fuzzy latex preview we should use `dvisvgm` as previewer.
 #+BEGIN_SRC elisp
 (setq org-directory "~/Dropbox/org"
       org-preview-latex-default-process 'dvisvgm)
+(setq flyspell-default-dictionary "en-custom")
 #+END_SRC
 
 Why doom believes it is a good idea to make ~org-cycle~ only cycle current
@@ -434,7 +453,7 @@ Make we preview buffer when we are switching buffers.
 #+END_SRC
 
 Some key bindings.
-#+BEGIN_SRC elisp :tangle no
+#+BEGIN_SRC elisp
 (defun helm-multi-swoop--exec-interactive ()
   (interactive)
   (helm-exit-and-execute-action 'helm-multi-swoop--exec))
@@ -465,10 +484,12 @@ Some key bindings.
       :ni "RET" 'helm-maybe-exit-minibuffer
       :ni "M-v" 'helm-previous-page
       :ni "C-v" 'helm-next-page)
-(after! counsel
-  (map! [remap apropos]  #'helm-apropos
-        [remap yank-pop] #'helm-show-kill-ring))
 
+(add-transient-hook! 'doom-first-input-hook
+  (ivy-mode -1)
+  (helm-mode +1)
+  (map! [remap apropos] #'helm-apropos
+        [remap yank-pop] #'helm-show-kill-ring))
 #+END_SRC
 
 

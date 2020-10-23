@@ -7,6 +7,10 @@
        (chinese +childframe)
        ;;japanese
 
+       :os
+       macos                        ; MacOS-specific commands
+       (tty +osc)                   ; improve the terminal Emacs experience
+
        :completion
        (company +childframe)        ; the ultimate code completion backend
        helm                         ; the *other* search engine for love and live
@@ -58,7 +62,7 @@
 
        :checkers
        syntax                       ; tasing you for every semicolon you forget
-       spell                        ; tasing you for misspelling mispelling
+       ;;spell                      ; tasing you for misspelling mispelling
        ;;grammar                    ; tasing grammar mistake every you make
 
        :emacs
@@ -86,7 +90,6 @@
         +dictionary
         +docsets +xwidget)          ; ...or in Dash docsets locally
        (lsp)
-       macos                        ; MacOS-specific commands
        magit                        ; a git porcelain for Emacs
        ;;make                       ; run make tasks from Emacs
        ;;pass                       ; password manager for nerds
@@ -135,6 +138,7 @@
        ;;nix                        ; I hereby declare "nix geht mehr!"
        ;;ocaml                      ; an objective camel
        (org                         ; organize your plain life in plain text
+        +pretty
         +dragndrop                  ; drag & drop files/images into org buffers
        ;; +ipython                  ; ipython/jupyter support for babel
         +noter                      ; take note with pdf files

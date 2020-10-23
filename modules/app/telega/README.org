@@ -1,0 +1,44 @@
+#+TITLE:   app/telega
+#+DATE:    June 26, 2020
+#+SINCE:   2.0.9
+#+STARTUP: inlineimages nofold
+
+* Table of Contents :TOC_3:noexport:
+- [[#description][Description]]
+  - [[#module-flags][Module Flags]]
+  - [[#plugins][Plugins]]
+  - [[#hacks][Hacks]]
+- [[#prerequisites][Prerequisites]]
+- [[#features][Features]]
+- [[#configuration][Configuration]]
+- [[#troubleshooting][Troubleshooting]]
+  - [[#user-profile-photo-might-be-broken][User profile photo might be broken.]]
+
+* Description
+Use Emacs as a Telegram.app client
+
+** Module Flags
+This module provides no flags.
+
+** Plugins
++ [[https://github.com/zevlg/telega.el][telega.el]]
++ when =:completionn helm= is enabled
+  + [[https://github.com/telega-user/helm-telega][helm-telega]]
+
+** Hacks
+When =:input chinese= is enabled, some probes are provided to auto switch input
+method.
+
+* Prerequisites
+~tdlib~ is needed for ~telega.el~ to work.
+
+* Features
+# An in-depth list of features, how to use them, and their dependencies.
+
+* Configuration
+# How to configure this module, including common problems and how to address them.
+
+* Troubleshooting
+** User profile photo might be broken.
+This is caused by the actual line height and height of default font is not
+match. Consider adjust the font used for symbols, etc.

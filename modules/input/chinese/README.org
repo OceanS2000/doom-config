@@ -1,0 +1,46 @@
+#+TITLE:   input/chinese
+#+DATE:    June 26, 2020
+#+SINCE:   2.0.9
+#+STARTUP: inlineimages nofold
+
+* Table of Contents :TOC_3:noexport:
+- [[#description][Description]]
+  - [[#module-flags][Module Flags]]
+  - [[#plugins][Plugins]]
+  - [[#hacks][Hacks]]
+- [[#prerequisites][Prerequisites]]
+  - [[#rime][Rime]]
+- [[#features][Features]]
+- [[#configuration][Configuration]]
+- [[#troubleshooting][Troubleshooting]]
+
+* Description
+This module adds support for Chinese input support by ~pyim~.
+
+** Module Flags
++ =+childframe= Use ~posframe~ package for input method.
++ =+rime= Use ~emacs-rime~ instead of ~pyim~ (not implemented)
+
+** Plugins
++ [[https://github.com/tumashu/pyim][pyim]] (unless =+rime=)
++ [[https://github.com/DogLooksGood/emacs-rime/][emacs-rime]] (when =+rime=)
+
+** Hacks
++ ~org-html-paragraph~ has been modified to join consecutive Chinese lines into
+  a single long line without wanted spaced (when exporting org-mode to html).
++ The double pinyin input method is embedded.
+
+* Prerequisites
+** Rime
+When used with =+rime= support, ~librime~ library is needed. See [[https://github.com/DogLooksGood/emacs-rime/][README.md]] of
+~emacs-rime~ for details.
+
+* Features
+This module adds support for Chinese input support by ~pyim~.
+
+* Configuration
+For me it works out of box. No specific configuration options expect for those
+provided by the package is included.
+
+* Troubleshooting
+Maybe [[https://github.com/cnsunyour/.doom.d/tree/develop/modules/cnsunyour/chinese][this chinese module]] can be used as reference
