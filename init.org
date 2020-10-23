@@ -1,0 +1,351 @@
+#+TITLE: Emacs Configuration File
+#+AUTHOR: Komeiji Ocean
+
+This is my main Emacs config file.
+
+* The early init configuration
+#+begin_src elisp :tangle early-init.el
+;;; early-init.el -*- lexical-binding: t; -*-
+
+;; Emacs HEAD (27+) introduces early-init.el, which is run before init.el,
+;; before package and UI initialization happens.
+
+;; Defer garbage collection further back in the startup process
+(setq gc-cons-threshold most-positive-fixnum)
+
+;; In Emacs 27+, package initialization occurs before `user-init-file' is
+;; loaded, but after `early-init-file'. Doom handles package initialization, so
+;; we must prevent Emacs from doing it early!
+;; (setq package-enable-at-startup nil)
+;; (advice-add #'package--ensure-init-file :override #'ignore)
+
+;; Prevent the glimpse of un-styled Emacs by disabling these UI elements early.
+(push '(menu-bar-lines . 0) default-frame-alist)
+(push '(tool-bar-lines . 0) default-frame-alist)
+(push '(vertical-scroll-bars) default-frame-alist)
+
+;; Resizing the Emacs frame can be a terribly expensive part of changing the
+;; font. By inhibiting this, we easily halve startup times with fonts that are
+;; larger than the system default.
+(setq frame-inhibit-implied-resize t)
+
+;; Ignore X resources; its settings would be redundant with the other settings
+;; in this file and can conflict with later config (particularly where the
+;; cursor color is concerned).
+(advice-add #'x-apply-session-resources :override #'ignore)
+
+;; Prevent unwanted runtime builds in gccemacs (native-comp); packages are
+;; compiled ahead-of-time when they are installed and site files are compiled
+;; when gccemacs is installed.
+;; (setq comp-deferred-compilation nil)
+#+end_src
+
+* Headers
+The header for =init.el= file, including lexical binding request.
+#+begin_src elisp :tangle init.el
+;;; init.el --- Oceansen's Emacs Config file -*- lexical-binding: t; -*-
+;; Copyright (C) 2020 Oceansen
+;;
+;; This program is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+;;
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+;;
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+;;
+;; This file is not part of GNU Emacs.
+#+end_src
+
+* Some Default Values
+After init, we need to setup some default settings.
+#+begin_src elisp
+(setq-default debug-on-error t
+              message-log-max 8192
+              ad-redefinition-action 'accept
+              menu-bar-mode nil
+              tool-bar-mode nil
+              scroll-bar-mode nil)
+#+end_src
+
+We need to decide current platform.
+#+begin_src elisp
+(defconst IS-MAC (eq system-type 'darwin))
+(defconst IS-LINUX (eq system-type 'gnu/linux))
+#+end_src
+
+The serval lines below make UTF-8 the default coding system, adopted from Doom
+Emacs.
+#+begin_src elisp
+(when (fboundp 'set-charset-priority)
+  (set-charset-priority 'unicode))       ; pretty
+(prefer-coding-system 'utf-8)            ; pretty
+(setq locale-coding-system 'utf-8)       ; please
+#+end_src
+
+A second, case-insensitive pass over `auto-mode-alist' is time wasted, and
+indicates misconfiguration (or that the user needs to stop relying on case
+insensitivity).
+#+begin_src elisp
+(setq auto-mode-case-fold nil)
+#+end_src
+
+Inhibit startup messages.
+#+begin_src elisp
+(setq inhibit-startup-message t
+      inhibit-startup-echo-area-message t
+      inhibit-default-init t)
+(unless (daemonp)
+  (advice-add #'display-startup-echo-area-message :override #'ignore))
+#+end_src
+
+Slow Emacs idle update a little down.
+#+begin_src emacs-lisp :tangle yes
+(setq idle-update-delay 1.0)
+#+end_src
+
+More secure default settings for GNUTLS.
+#+begin_src emacs-lisp :tangle yes
+(setq gnutls-algorithm-priority
+      (when (boundp 'libgnutls-version)
+        (concat "SECURE128:+SECURE192:-VERS-ALL"
+                ":+VERS-TLS1.3"
+                ":+VERS-TLS1.2"))
+      ;; `gnutls-min-prime-bits' is set based on recommendations from
+      ;; https://www.keylength.com/en/4/
+      gnutls-min-prime-bits 3072
+      tls-checktrust gnutls-verify-error
+      ;; Emacs is built with `gnutls' by default, so `tls-program' would not be
+      ;; used in that case. Otherwise, people have reasons to not go with
+      ;; `gnutls', we use `openssl' instead. For more details, see
+      ;; https://redd.it/8sykl1
+      tls-program '("openssl s_client -connect %h:%p -CAfile %t -nbio -no_ssl3 -no_tls1 -no_tls1_1 -ign_eof"
+                    "gnutls-cli -p %p --dh-bits=3072 --ocsp --x509cafile=%t \
+--strict-tofu --priority='SECURE192:+SECURE128:-VERS-ALL:+VERS-TLS1.2:+VERS-TLS1.3' %h"
+                    ;; compatibility fallbacks
+                    "gnutls-cli -p %p %h"))
+#+end_src
+
+We need a more secure =authinfo=. System integrated keychain may do this, but we
+need a fallback.
+#+begin_src emacs-lisp :tangle yes
+(setq auth-sources (list "~/.authinfo.gpg"))
+#+end_src
+
+* Bootstrap of Package Manager
+The package manager needs special setup before other configrations.
+#+begin_src elisp
+(setq straight-repository-branch "develop"
+      straight-vc-git-default-clone-depth 1
+      straight-enable-package-integration nil
+      straight-check-for-modifications '(check-on-save find-when-checking))
+
+(defvar bootstrap-version)
+(let ((bootstrap-file
+       (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory))
+      (bootstrap-version 5))
+  (unless (file-exists-p bootstrap-file)
+    (with-current-buffer
+        (url-retrieve-synchronously
+         "https://raw.githubusercontent.com/raxod502/straight.el/develop/install.el"
+         'silent 'inhibit-cookies)
+      (goto-char (point-max))
+      (eval-print-last-sexp)))
+  (load bootstrap-file nil 'nomessage))
+#+end_src
+
+* Init packages
+
+** benchmark-init
+
+This package is a simple init time record tool.
+#+begin_src elisp
+(straight-use-package 'benchmark-init)
+(with-eval-after-load 'benchmark-init
+  (add-hook 'after-init-hook #'benchmark-init/deactivate))
+(require 'benchmark-init)
+(benchmark-init/activate)
+#+end_src
+
+** GCMH
+
+Garbage Collector Magic Hack can set garbage collection threshold based on
+whether Emacs is idle.
+#+begin_src elisp
+(straight-use-package 'gcmh)
+(require 'gcmh)
+(setq gcmh-verbose t
+      gcmh-low-cons-threshold #x800000
+      gcmh-high-cons-threshold most-positive-fixnum
+      gcmh-idle-delay 30)
+(gcmh-mode)
+#+end_src
+
+** No Littering
+
+Rewrites many packages' temp file directory in an organized manner.
+#+begin_src emacs-lisp
+(straight-use-package 'no-littering)
+(require 'no-littering)
+#+end_src
+
+** Org mode
+#+begin_src elisp
+(straight-use-package 'org-plus-contrib)
+#+end_src
+
+** General.el
+
+Load [[https://github.com/noctuid/general.el][general.el]] early so that we can use all its goodies.
+#+begin_src emacs-lisp :tangle yes
+(straight-use-package 'general)
+(require 'general)
+#+end_src
+
+* Possible Init Optimizations
+
+Doom Emacs disabled bidi-rendering to boost performance. I'm not sure whether it
+is good, though.
+#+begin_src emacs-lisp :tangle no
+(setq-default bidi-display-reordering 'left-to-right
+              bidi-paragraph-direction 'left-to-right
+              bidi-inhibit-bpa t)
+#+end_src
+
+Cut serval corners of redisplaying.
+#+begin_src emacs-lisp :tangle yes
+(setq-default cursor-in-non-selected-windows nil)
+(setq highlight-nonselected-windows nil
+      fast-but-imprecise-scrolling t
+      frame-inhibit-implied-resize t
+      inhibit-compacting-font-caches t)
+#+end_src
+
+=tty-run-terminal-initialization= is *tremendously* slow for some reason;
+inexplicably doubling startup time for terminal Emacs. Keeping it disabled will
+have nasty side-effects, so we simply delay it until later in the startup
+process and, for some reason, it runs much faster when it does.
+#+begin_src emacs-lisp :tangle yes
+(unless
+    (daemonp) (advice-add #'tty-run-terminal-initialization :override #'ignore)
+    (add-hook! 'window-setup-hook
+      (defun doom-init-tty-h ()
+        (advice-remove #'tty-run-terminal-initialization #'ignore)
+        (tty-run-terminal-initialization (selected-frame) nil t))))
+#+end_src
+
+* Editor Basic Setup
+
+** Create on Find File
+#+begin_src emacs-lisp :tangle yes
+(add-hook! 'find-file-not-found-functions
+  (defun doom-create-missing-directories-h ()
+    "Automatically create missing directories when creating new files."
+    (unless (file-remote-p buffer-file-name)
+      (let ((parent-directory (file-name-directory buffer-file-name)))
+        (and (not (file-directory-p parent-directory))
+             (y-or-n-p (format "Directory `%s' does not exist! Create it?"
+                               parent-directory))
+             (progn (make-directory parent-directory 'parents)
+                    t))))))
+#+end_src
+
+** Autosave and Lock-file
+
+Autosaving and locking make Emacs crash consistent.
+#+begin_src emacs-lisp :tangle yes
+(setq create-lockfiles t
+      auto-save-file-name-transforms
+      `((,tramp-file-name-regexp
+         ,(concat temporary-file-directory "\\2") t)
+        (".*" ,auto-save-list-file-prefix t))
+      auto-save-default t
+      auto-save-include-big-deletions t)
+#+end_src
+
+Backup files are made so we can always 'go back in time'.
+#+begin_src emacs-lisp :tangle yes
+(setq make-backup-files t
+      backup-by-copying-when-linked t
+      backup-by-copying-when-mismatch t)
+
+;; The settings of no-littering delibately overwritten here because we want
+;; backup files very visible.
+(with-eval-after-load 'no-littering
+  (setq backup-directory-alist (cons tramp-file-name-regexp nil)))
+#+end_src
+
+** Formatting
+
+If current buffer has =fundamental-mode=, try to set a correct major-mode when
+auto saving for (often) better highlighting.
+#+begin_src emacs-lisp :tangle yes
+(general-add-hook '(after-save-hook auto-save-hook)
+          (defun doom-guess-mode-h ()
+            "Guess mode when saving file in `fundamental-mode'."
+            (when (eq major-mode 'fundamental-mode)
+              (let ((buffer (or (buffer-base-buffer) (current-buffer))))
+                (and (buffer-file-name buffer)
+                     (eq buffer (window-buffer (selected-window)))
+                     (set-auto-mode))))))
+#+end_src
+
+Tab width of 8 makes indentation more clear and eliminates the need of
+'indentation rules' or whatever.
+#+begin_src emacs-lisp :tangle yes
+(setq-default indent-tabs-mode t
+              tab-width 8
+              tab-always-indent nil)
+#+end_src
+
+=tabify= and =untabify= should only affect indentation.
+#+begin_src emacs-lisp :tangle yes
+(setq tabify-regexp "^\\t* [ \\t]+")
+#+end_src
+
+An archaic default in the age of widescreen 4k displays? I disagree. We still
+frequently split our terminals and editor frames, or have them side-by-side,
+using up more of that newly available horizontal real-estate.
+#+begin_src emacs-lisp :tangle yes
+(setq-default fill-column 80
+#+end_src
+
+We need word wrap, but soft wrapping every buffer is simply too much.
+#+begin_src emacs-lisp :tangle yes
+(require 'kinsoku)
+(setq-default word-wrap t
+              enable-kinsoku t
+              truncate-lines t
+              truncate-partial-width-windows nil)
+#+end_src
+
+Single space for sentence end is enough, especially in monowidth font.
+#+begin_src emacs-lisp :tangle yes
+(setq sentence-end-double-space nil)
+#+end_src
+
+Final newline character is POSIX requirement.
+#+begin_src emacs-lisp :tangle yes
+(setq require-final-newline t)
+#+end_src
+
+In =text-mode=, =auto-fill-mode= is almost always good.
+#+begin_src emacs-lisp :tangle yes
+(add-hook 'text-mode-hook #'auto-fill-mode)
+#+end_src
+
+** Clipboard a.k.a Kill-ring
+
+#+begin_src emacs-lisp :tangle yes
+(setq kill-do-not-save-duplicates t
+      x-select-request-type '(UTF8_STRING COMPOUND_TEXT TEXT STRING))
+#+end_src
+
+** Auto reverting, saving
+
+** Evil Mode
